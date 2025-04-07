@@ -2,10 +2,10 @@ WITH github_issues AS (
   SELECT
     COALESCE(ght.language, gh_language.name) AS language,
     EXTRACT(YEAR FROM PARSE_TIMESTAMP('%Y-%m-%dT%H:%M:%SZ', JSON_EXTRACT_SCALAR(payload, '$.issue.created_at'))) AS year,
-    EXTRACT(QUARTER FROM PARSE_TIMESTAMP('%Y-%m-%dT%H:%M:%SZ', JSON_EXTRACT_SCALAR(payload, '$.issue.created_at'))) AS quarter,
+    EXTRACT(MONTH FROM PARSE_TIMESTAMP('%Y-%m-%dT%H:%M:%SZ', JSON_EXTRACT_SCALAR(payload, '$.issue.created_at'))) AS quarter,
     COUNT(DISTINCT events.id) AS issues,
   FROM
-    `githubarchive.year.20*` AS events
+    `githubarchive.day.20*` AS events
   JOIN -- Find the repo's language with public github data
     `bigquery-public-data.github_repos.languages` AS gh
     ON
@@ -17,6 +17,8 @@ WITH github_issues AS (
       events.repo.id = ght.project_id
   WHERE
     events.type = 'IssuesEvent' -- Only get Issues for this table
+    AND
+    JSON_EXTRACT_SCALAR(events.payload, '$.action') = 'opened' -- Only select Issues that were Opened
   GROUP BY
     language, year, quarter
 )
