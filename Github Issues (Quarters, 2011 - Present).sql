@@ -5,7 +5,7 @@ WITH github_issues AS (
     EXTRACT(MONTH FROM PARSE_TIMESTAMP('%Y-%m-%dT%H:%M:%SZ', JSON_EXTRACT_SCALAR(payload, '$.issue.created_at'))) AS quarter,
     COUNT(DISTINCT events.id) AS issues,
   FROM
-    `githubarchive.day.20*` AS events
+    `githubarchive.year.20*` AS events
   JOIN -- Find the repo's language with public github data
     `bigquery-public-data.github_repos.languages` AS gh
     ON
