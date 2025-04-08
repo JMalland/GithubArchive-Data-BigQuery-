@@ -1,34 +1,46 @@
-WITH github_pull_requests AS (
+WITH gh_lang AS (
   SELECT
-    COALESCE(ght.language, gh_language.name) AS language,
+    gh_language.name AS language,
     EXTRACT(YEAR FROM events.created_at) AS year,
     EXTRACT(MONTH FROM events.created_at) AS month,
-    COUNT(DISTINCT events.id) AS pull_requests,
+    events.id AS pull_request_id
   FROM
     `githubarchive.year.20*` AS events
-  JOIN -- Find the repo's language with public github data
+  JOIN
     `bigquery-public-data.github_repos.languages` AS gh
-    ON
-      events.repo.name = gh.repo_name,
-      UNNEST(gh.language) AS gh_language
-  LEFT OUTER JOIN -- Resolve not-found repos ghtorrent
-    `ghtorrent-bq.ght.project_languages` AS ght
-    ON
-      events.repo.id = ght.project_id
+    ON events.repo.name = gh.repo_name,
+    UNNEST(gh.language) AS gh_language
   WHERE
-    events.type = 'PullRequestEvent' -- Only get Pull Requests for this table
-  GROUP BY
-    language, year, month
+    events.type = 'IssuesEvent' AND
+    JSON_EXTRACT_SCALAR(events.payload, '$.action') = 'opened'
+  GROUP BY language, year, month, pull_request_id
+),
+ght_lang AS (
+  SELECT
+    ght.language AS language,
+    EXTRACT(YEAR FROM events.created_at) AS year,
+    EXTRACT(MONTH FROM events.created_at) AS month,
+    events.id AS pull_request_id
+  FROM
+    `githubarchive.year.20*` AS events
+  JOIN
+    `ghtorrent-bq.ght.project_languages` AS ght
+    ON events.repo.id = ght.project_id
+  WHERE
+    events.type = 'PullRequestEvent'
+  GROUP BY language, year, month, pull_request_id
+),
+combined_pull_requests AS (
+  SELECT * FROM gh_lang
+  UNION DISTINCT
+  SELECT * FROM ght_lang
 )
 
 SELECT
   language,
   year,
   month,
-  pull_requests,
-FROM 
-  github_pull_requests
-GROUP BY
-  language, year, month, pull_requests
-ORDER BY
-  year DESC, month DESC, pull_requests DESC
+  COUNT(DISTINCT pull_request_id) AS pull_requests
+FROM combined_pull_requests
+GROUP BY language, year, month
+ORDER BY year DESC, month DESC, pull_requests DESC;
