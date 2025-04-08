@@ -11,8 +11,7 @@ WITH gh_lang AS (
     ON events.repo.name = gh.repo_name,
     UNNEST(gh.language) AS gh_language
   WHERE
-    events.type = 'IssuesEvent' AND
-    JSON_EXTRACT_SCALAR(events.payload, '$.action') = 'opened'
+    events.type = 'PushEvent'
   GROUP BY language, year, month, commit_id
 ),
 ght_lang AS (
