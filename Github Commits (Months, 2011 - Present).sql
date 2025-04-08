@@ -44,4 +44,4 @@ SELECT
   COUNT(DISTINCT commit_id) AS commits
 FROM combined_commits
 GROUP BY language, year, month
-ORDER BY year DESC, month DESC, issues DESC;
+ORDER BY year DESC, month DESC, commits DESC;
