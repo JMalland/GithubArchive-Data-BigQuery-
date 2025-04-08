@@ -26,8 +26,7 @@ ght_lang AS (
     `ghtorrent-bq.ght.project_languages` AS ght
     ON events.repo.id = ght.project_id
   WHERE
-    events.type = 'IssuesEvent' AND
-    JSON_EXTRACT_SCALAR(events.payload, '$.action') = 'opened'
+    events.type = 'PushEvent'
   GROUP BY language, year, month, commit_id
 ),
 combined_commits AS (
