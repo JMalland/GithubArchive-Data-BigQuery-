@@ -1,35 +1,45 @@
-# Untested -- Ran out of free trial :P
-WITH github_pull_request_creators AS (
+WITH gh_lang AS (
   SELECT
-    COALESCE(ght.language, gh_language.name) AS language,
+    gh_language.name AS language,
     EXTRACT(YEAR FROM events.created_at) AS year,
     EXTRACT(MONTH FROM events.created_at) AS month,
-    COUNT(DISTINCT JSON_EXTRACT_SCALAR(events.payload, '$.pull_request.user.id')) AS pull_request_creators,
+    JSON_EXTRACT_SCALAR(events.payload, '$.pull_request.user.id') AS pull_request_creator_id
   FROM
     `githubarchive.year.20*` AS events
-  JOIN -- Find the repo's language with public github data
+  JOIN
     `bigquery-public-data.github_repos.languages` AS gh
-    ON
-      events.repo.name = gh.repo_name,
-      UNNEST(gh.language) AS gh_language
-  LEFT OUTER JOIN -- Resolve not-found repos ghtorrent
-    `ghtorrent-bq.ght.project_languages` AS ght
-    ON
-      events.repo.id = ght.project_id
+    ON events.repo.name = gh.repo_name,
+    UNNEST(gh.language) AS gh_language
   WHERE
-    events.type = 'PullRequestEvent' -- Only get Pull Requests for this table
-  GROUP BY
-    language, year, month
+    events.type = 'PullRequestEvent'
+  GROUP BY language, year, month, pull_request_creator_id
+),
+ght_lang AS (
+  SELECT
+    ght.language AS language,
+    EXTRACT(YEAR FROM events.created_at) AS year,
+    EXTRACT(MONTH FROM events.created_at) AS month,
+    JSON_EXTRACT_SCALAR(events.payload, '$.pull_request.user.id') AS pull_request_creator_id
+  FROM
+    `githubarchive.year.20*` AS events
+  JOIN
+    `ghtorrent-bq.ght.project_languages` AS ght
+    ON events.repo.id = ght.project_id
+  WHERE
+    events.type = 'PullRequestEvent'
+  GROUP BY language, year, month, pull_request_creator_id
+),
+combined_pull_request_creators AS (
+  SELECT * FROM gh_lang
+  UNION DISTINCT
+  SELECT * FROM ght_lang
 )
 
 SELECT
   language,
   year,
   month,
-  pull_request_creators,
-FROM 
-  github_pull_request_creators
-GROUP BY
-  language, year, month, pull_request_creators
-ORDER BY
-  year DESC, month DESC, pull_request_creators DESC
+  COUNT(DISTINCT pull_request_creator_id) AS pull_request_creators
+FROM combined_pull_request_creators
+GROUP BY language, year, month
+ORDER BY year DESC, month DESC, pull_request_creators DESC;
